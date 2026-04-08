@@ -2,7 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>疲労チェック（iPhone 最適化）</title>
+<title>疲労チェック（PWA版）</title>
+
+<!-- PWA 追加 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon.png">
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
 
@@ -13,13 +20,18 @@
 </head>
 <body>
 
-<h3>疲労チェック（iPhone 最適化版）</h3>
+<h3>疲労チェック（iPhone PWA版）</h3>
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 <div id="score" style="font-size:20px; margin-top:10px;"></div>
 <div id="log"></div>
 
 <script>
+// ▼ PWA Service Worker 登録
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
