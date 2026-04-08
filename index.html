@@ -2,10 +2,10 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>疲労チェック（Tasks Vision 軽量版）</title>
+  <title>疲労チェック（Tasks Vision 安定版）</title>
 
-  <!-- MediaPipe Tasks Vision bundle -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"></script>
+  <!-- Safari で確実に読み込ませるため defer を付ける -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"></script>
 
   <style>
     video, canvas {
@@ -20,7 +20,7 @@
 </head>
 <body>
 
-<h3>疲労チェック（MediaPipe Tasks Vision 軽量版）</h3>
+<h3>疲労チェック（MediaPipe Tasks Vision）</h3>
 
 <button id="startBtn">カメラを開始</button>
 
@@ -30,6 +30,9 @@
 <div id="log"></div>
 
 <script>
+  let faceLandmarker = null;
+  let running = false;
+
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
@@ -37,15 +40,16 @@
   const logDiv = document.getElementById("log");
   const startBtn = document.getElementById("startBtn");
 
-  let faceLandmarker = null;
-  let running = false;
-
   function dist(a, b) {
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
   async function initFaceLandmarker() {
-    // vision_bundle.js が読み込まれると global に vision が生える
+    // vision_bundle.js が読み込まれていれば vision が存在する
+    if (typeof vision === "undefined") {
+      throw new Error("vision が読み込まれていません（CDN ブロック or 読み込み失敗）");
+    }
+
     const {FaceLandmarker, FilesetResolver} = vision;
 
     const resolver = await FilesetResolver.forVisionTasks(
@@ -105,7 +109,7 @@
     try {
       await initFaceLandmarker();
     } catch (e) {
-      alert("FaceLandmarker 初期化エラー: " + e);
+      alert("FaceLandmarker 初期化エラー: " + e.message);
       return;
     }
 
