@@ -1,25 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>疲労チェック（軽量版）</title>
+  <meta charset="UTF-8">
+  <title>疲労チェック（Tasks Vision 軽量版）</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"></script>
+  <!-- MediaPipe Tasks Vision bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"></script>
 
-<style>
-  video, canvas {
-    width: 100%;
-    max-width: 320px;
-    height: 240px;
-    background: black;
-  }
-  #startBtn { padding: 10px 20px; font-size: 18px; margin: 20px 0; }
-  #log { white-space: pre-line; font-size: 14px; }
-</style>
+  <style>
+    video, canvas {
+      width: 100%;
+      max-width: 320px;
+      height: 240px;
+      background: black;
+    }
+    #startBtn { padding: 10px 20px; font-size: 18px; margin: 20px 0; }
+    #log { white-space: pre-line; font-size: 14px; }
+  </style>
 </head>
 <body>
 
-<h3>疲労チェック（MediaPipe 軽量版）</h3>
+<h3>疲労チェック（MediaPipe Tasks Vision 軽量版）</h3>
 
 <button id="startBtn">カメラを開始</button>
 
@@ -29,92 +30,105 @@
 <div id="log"></div>
 
 <script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const scoreDiv = document.getElementById("score");
-const logDiv = document.getElementById("log");
-const startBtn = document.getElementById("startBtn");
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const scoreDiv = document.getElementById("score");
+  const logDiv = document.getElementById("log");
+  const startBtn = document.getElementById("startBtn");
 
-let faceLandmarker;
-let running = false;
+  let faceLandmarker = null;
+  let running = false;
 
-// ▼ MediaPipe Tasks Vision の初期化
-async function initFaceLandmarker() {
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm/"
-  );
-
-  faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/face_landmarker.task"
-    },
-    runningMode: "VIDEO",
-    numFaces: 1
-  });
-}
-
-function dist(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-async function loop() {
-  if (!running) return;
-
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  const now = performance.now();
-  const result = faceLandmarker.detectForVideo(video, now);
-
-  if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-    const lm = result.faceLandmarks[0];
-
-    const L = [33,160,158,133,153,144];
-    const R = [362,385,387,263,373,380];
-
-    function EAR(ids) {
-      const p = ids.map(i => lm[i]);
-      const v1 = dist(p[1], p[5]);
-      const v2 = dist(p[2], p[4]);
-      const h  = dist(p[0], p[3]);
-      return (v1 + v2) / (2 * h);
-    }
-
-    const ear = (EAR(L) + EAR(R)) / 2;
-    const mouth = dist(lm[13], lm[14]);
-
-    let fatigue = 0;
-    if (ear < 0.20) fatigue += 40;
-    if (mouth > 0.06) fatigue += 30;
-
-    scoreDiv.innerText = `疲労スコア: ${fatigue}`;
-    logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
+  function dist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
-  requestAnimationFrame(loop);
-}
+  async function initFaceLandmarker() {
+    // vision_bundle.js が読み込まれると global に vision が生える
+    const {FaceLandmarker, FilesetResolver} = vision;
 
-startBtn.onclick = async () => {
-  await initFaceLandmarker();
+    const resolver = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm/"
+    );
 
-  navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user", width: 160, height: 120 }
-  }).then(stream => {
-    video.srcObject = stream;
+    faceLandmarker = await FaceLandmarker.createFromOptions(resolver, {
+      baseOptions: {
+        modelAssetPath:
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/face_landmarker.task"
+      },
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+  }
 
-    video.onloadeddata = () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+  async function loop() {
+    if (!running || !faceLandmarker) {
+      requestAnimationFrame(loop);
+      return;
+    }
 
-      startBtn.style.display = "none";
-      running = true;
-      loop();
-    };
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    video.play();
-  });
-};
+    const now = performance.now();
+    const result = faceLandmarker.detectForVideo(video, now);
+
+    if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+      const lm = result.faceLandmarks[0];
+
+      const L = [33,160,158,133,153,144];
+      const R = [362,385,387,263,373,380];
+
+      function EAR(ids) {
+        const p = ids.map(i => lm[i]);
+        const v1 = dist(p[1], p[5]);
+        const v2 = dist(p[2], p[4]);
+        const h  = dist(p[0], p[3]);
+        return (v1 + v2) / (2 * h);
+      }
+
+      const ear = (EAR(L) + EAR(R)) / 2;
+      const mouth = dist(lm[13], lm[14]);
+
+      let fatigue = 0;
+      if (ear < 0.20) fatigue += 40;
+      if (mouth > 0.06) fatigue += 30;
+
+      scoreDiv.innerText = `疲労スコア: ${fatigue}`;
+      logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.onclick = async () => {
+    try {
+      await initFaceLandmarker();
+    } catch (e) {
+      alert("FaceLandmarker 初期化エラー: " + e);
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: 160, height: 120 },
+      audio: false
+    }).then(stream => {
+      video.srcObject = stream;
+
+      video.onloadeddata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        startBtn.style.display = "none";
+        running = true;
+        requestAnimationFrame(loop);
+      };
+
+      video.play();
+    }).catch(err => {
+      alert("カメラ取得エラー: " + err);
+    });
+  };
 </script>
 
 </body>
