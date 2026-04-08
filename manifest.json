@@ -1,7 +1,7 @@
 {
   "name": "疲労チェック",
   "short_name": "疲労チェック",
-  "start_url": "index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
