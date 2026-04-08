@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>疲労チェック（PWA版）</title>
 
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,18 +15,21 @@
 <style>
   video, canvas { width: 100%; max-width: 320px; }
   #log { font-size: 14px; white-space: pre-line; }
+  #startBtn { padding: 10px 20px; font-size: 18px; margin: 20px 0; }
 </style>
 </head>
 <body>
 
 <h3>疲労チェック（iPhone PWA版）</h3>
+
+<button id="startBtn">カメラを開始</button>
+
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 <div id="score" style="font-size:20px; margin-top:10px;"></div>
 <div id="log"></div>
 
 <script>
-// ▼ PWA Service Worker 登録
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js");
 }
@@ -37,13 +39,12 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const scoreDiv = document.getElementById("score");
 const logDiv = document.getElementById("log");
+const startBtn = document.getElementById("startBtn");
 
-// ▼ 距離計算
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-// ▼ FaceMesh 設定
 const faceMesh = new FaceMesh.FaceMesh({
   locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
 });
@@ -55,7 +56,6 @@ faceMesh.setOptions({
   minTrackingConfidence: 0.5
 });
 
-// ▼ FaceMesh の結果処理
 faceMesh.onResults(results => {
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -90,7 +90,6 @@ faceMesh.onResults(results => {
   logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
 });
 
-// ▼ ループ処理（video.play() 後に開始）
 async function loop() {
   canvas.width = 320;
   canvas.height = 240;
@@ -99,18 +98,20 @@ async function loop() {
   requestAnimationFrame(loop);
 }
 
-// ▼ iPhone PWA で必須：video.play() を待つ
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "user", width: 320, height: 240 }
-}).then(async stream => {
+// ▼ ここが最重要：ユーザー操作でカメラ開始
+startBtn.onclick = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: 320, height: 240 }
+  });
+
   video.srcObject = stream;
 
-  // ▼ これが無いと PWA で FaceMesh が動かない
-  await video.play();
+  await video.play();  // ← PWA で必須
 
-  // ▼ 再生可能になってから開始
-  loop();
-});
+  startBtn.style.display = "none"; // ボタン非表示
+
+  loop(); // ここで初めて開始
+};
 </script>
 
 </body>
