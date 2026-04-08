@@ -118,6 +118,9 @@ startBtn.onclick = async () => {
 
   video.srcObject = stream;
 
+  // ▼ Safari PWA では必須（これが無いと黒画面になる）
+  video.muted = true;
+
   await video.play();  // ← PWA で必須
 
   startBtn.style.display = "none"; // ボタン非表示
