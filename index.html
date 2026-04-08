@@ -101,10 +101,20 @@ faceMesh.onResults(results => {
   logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
 });
 
+let frameCount = 0;
+
 async function loop() {
-  await faceMesh.send({ image: video });
+  frameCount++;
+
+  // ▼ 3フレームに1回だけ FaceMesh を実行
+  if (frameCount % 3 === 0) {
+    await faceMesh.send({ image: video });
+  }
+
   requestAnimationFrame(loop);
 }
+
+
 
 // ▼ Safari がユーザー操作と認識する同期イベント
 startBtn.onclick = () => {
