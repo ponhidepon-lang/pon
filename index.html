@@ -111,27 +111,26 @@ async function loop() {
 }
 
 // ▼ ここが最重要：ユーザー操作でカメラ開始
-startBtn.onclick = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ 
+startBtn.onclick = () => {
+  navigator.mediaDevices.getUserMedia({
     audio: false,
     video: { facingMode: "user", width: 320, height: 240 }
+  }).then(stream => {
+
+    video.srcObject = stream;
+
+    video.muted = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+
+    // ▼ 最重要：同期で呼ぶ（await を絶対に使わない）
+    video.play();
+
+    startBtn.style.display = "none";
+    loop();
   });
-
-  video.srcObject = stream;
-
-  // ▼ Safari PWA では必須（これが無いと黒画面になる）
-  video.muted = true;
-
-  // ▼ 最重要：Safari PWA で必須
-  video.setAttribute("playsinline", "");
-  video.setAttribute("webkit-playsinline", "");
-
-  video.play();  // ← PWA で必須
-
-  startBtn.style.display = "none"; // ボタン非表示
-
-  loop(); // ここで初めて開始
 };
+  
 </script>
 
 </body>
