@@ -112,7 +112,8 @@ async function loop() {
 
 // ▼ ここが最重要：ユーザー操作でカメラ開始
 startBtn.onclick = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({
+  const stream = await navigator.mediaDevices.getUserMedia({ 
+    audio: false,
     video: { facingMode: "user", width: 320, height: 240 }
   });
 
