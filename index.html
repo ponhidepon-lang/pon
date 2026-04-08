@@ -4,34 +4,22 @@
 <meta charset="UTF-8">
 <title>疲労チェック（軽量版）</title>
 
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ffffff">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="icon.png">
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"></script>
 
 <style>
-  video {
+  video, canvas {
     width: 100%;
     max-width: 320px;
     height: 240px;
     background: black;
   }
-  canvas {
-    width: 100%;
-    max-width: 320px;
-    height: 240px;
-  }
-  #log { font-size: 14px; white-space: pre-line; }
   #startBtn { padding: 10px 20px; font-size: 18px; margin: 20px 0; }
+  #log { white-space: pre-line; font-size: 14px; }
 </style>
-
 </head>
 <body>
 
-<h3>疲労チェック（iPhone SE3 軽量版）</h3>
+<h3>疲労チェック（MediaPipe 軽量版）</h3>
 
 <button id="startBtn">カメラを開始</button>
 
@@ -41,10 +29,6 @@
 <div id="log"></div>
 
 <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
-}
-
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -52,103 +36,84 @@ const scoreDiv = document.getElementById("score");
 const logDiv = document.getElementById("log");
 const startBtn = document.getElementById("startBtn");
 
+let faceLandmarker;
+let running = false;
+
+// ▼ MediaPipe Tasks Vision の初期化
+async function initFaceLandmarker() {
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+  );
+
+  faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath:
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/face_landmarker.task"
+    },
+    runningMode: "VIDEO",
+    numFaces: 1
+  });
+}
+
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-// ▼ FaceMesh（軽量設定）
-const faceMesh = new FaceMesh.FaceMesh({
-  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-});
+async function loop() {
+  if (!running) return;
 
-faceMesh.setOptions({
-  maxNumFaces: 1,
-  refineLandmarks: false,   // ← GPU負荷を大幅削減
-  minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.5
-});
-
-faceMesh.onResults(results => {
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  if (!results.multiFaceLandmarks) {
-    scoreDiv.innerText = "顔が検出されていません";
-    return;
-  }
+  const now = performance.now();
+  const result = faceLandmarker.detectForVideo(video, now);
 
-  const lm = results.multiFaceLandmarks[0];
+  if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+    const lm = result.faceLandmarks[0];
 
-  const L = [33,160,158,133,153,144];
-  const R = [362,385,387,263,373,380];
+    const L = [33,160,158,133,153,144];
+    const R = [362,385,387,263,373,380];
 
-  function EAR(ids) {
-    const p = ids.map(i => lm[i]);
-    const v1 = dist(p[1], p[5]);
-    const v2 = dist(p[2], p[4]);
-    const h  = dist(p[0], p[3]);
-    return (v1 + v2) / (2 * h);
-  }
+    function EAR(ids) {
+      const p = ids.map(i => lm[i]);
+      const v1 = dist(p[1], p[5]);
+      const v2 = dist(p[2], p[4]);
+      const h  = dist(p[0], p[3]);
+      return (v1 + v2) / (2 * h);
+    }
 
-  const ear = (EAR(L) + EAR(R)) / 2;
-  const mouth = dist(lm[13], lm[14]);
+    const ear = (EAR(L) + EAR(R)) / 2;
+    const mouth = dist(lm[13], lm[14]);
 
-  let fatigue = 0;
-  if (ear < 0.20) fatigue += 40;
-  if (mouth > 0.06) fatigue += 30;
+    let fatigue = 0;
+    if (ear < 0.20) fatigue += 40;
+    if (mouth > 0.06) fatigue += 30;
 
-  fatigue = Math.min(100, fatigue);
-
-  scoreDiv.innerText = `疲労スコア: ${fatigue}`;
-  logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
-});
-
-// ▼ 5フレームに1回だけ FaceMesh を実行（SE3安定化の決め手）
-let frameCount = 0;
-
-async function loop() {
-  frameCount++;
-
-  if (frameCount % 5 === 0) {
-    await faceMesh.send({ image: video });
+    scoreDiv.innerText = `疲労スコア: ${fatigue}`;
+    logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
   }
 
   requestAnimationFrame(loop);
 }
 
-// ▼ Safari がユーザー操作と認識する同期イベント
-startBtn.onclick = () => {
+startBtn.onclick = async () => {
+  await initFaceLandmarker();
 
-  const constraints = {
-    audio: false,
-    video: { facingMode: "user", width: 160, height: 120 }  // ← 解像度を半分にして安定化
-  };
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: 160, height: 120 }
+  }).then(stream => {
+    video.srcObject = stream;
 
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(stream => {
+    video.onloadeddata = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-      video.srcObject = stream;
+      startBtn.style.display = "none";
+      running = true;
+      loop();
+    };
 
-      video.muted = true;
-      video.setAttribute("playsinline", "");
-      video.setAttribute("webkit-playsinline", "");
-
-      // ▼ 内部バッファ初期化
-      video.onloadedmetadata = () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      };
-
-      // ▼ Safari で確実に発火するイベント
-      video.onloadeddata = () => {
-        startBtn.style.display = "none";
-        loop();
-      };
-
-      video.play();
-    })
-    .catch(err => {
-      alert("カメラ取得エラー: " + err);
-    });
+    video.play();
+  });
 };
 </script>
 
