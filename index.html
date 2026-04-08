@@ -123,14 +123,14 @@ startBtn.onclick = () => {
       video.setAttribute("playsinline", "");
       video.setAttribute("webkit-playsinline", "");
 
-      // ▼ 内部バッファ初期化待ち
+      // ▼ 内部バッファ初期化（Safariで必須）
       video.onloadedmetadata = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
       };
 
-      // ▼ Safari は再生開始が遅れるので onplaying を使う
-      video.onplaying = () => {
+      // ▼ Safari で確実に発火するイベント
+      video.onloadeddata = () => {
         startBtn.style.display = "none";
         loop();
       };
