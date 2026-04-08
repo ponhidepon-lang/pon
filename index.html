@@ -50,4 +50,98 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const scoreDiv = document.getElementById("score");
 const logDiv = document.getElementById("log");
-const startBtn = document
+const startBtn = document.getElementById("startBtn");
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+const faceMesh = new FaceMesh.FaceMesh({
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+});
+
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+
+faceMesh.onResults(results => {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  if (!results.multiFaceLandmarks) {
+    scoreDiv.innerText = "顔が検出されていません";
+    return;
+  }
+
+  const lm = results.multiFaceLandmarks[0];
+
+  const L = [33,160,158,133,153,144];
+  const R = [362,385,387,263,373,380];
+
+  function EAR(ids) {
+    const p = ids.map(i => lm[i]);
+    const v1 = dist(p[1], p[5]);
+    const v2 = dist(p[2], p[4]);
+    const h  = dist(p[0], p[3]);
+    return (v1 + v2) / (2 * h);
+  }
+
+  const ear = (EAR(L) + EAR(R)) / 2;
+  const mouth = dist(lm[13], lm[14]);
+
+  let fatigue = 0;
+  if (ear < 0.20) fatigue += 40;
+  if (mouth > 0.06) fatigue += 30;
+
+  fatigue = Math.min(100, fatigue);
+
+  scoreDiv.innerText = `疲労スコア: ${fatigue}`;
+  logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
+});
+
+async function loop() {
+  await faceMesh.send({ image: video });
+  requestAnimationFrame(loop);
+}
+
+// ▼ Safari がユーザー操作と認識する同期イベント
+startBtn.onclick = () => {
+
+  const constraints = {
+    audio: false,
+    video: { facingMode: "user", width: 320, height: 240 }
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(stream => {
+
+      video.srcObject = stream;
+
+      video.muted = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+
+      // ▼ 内部バッファ初期化待ち
+      video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      };
+
+      // ▼ Safari は再生開始が遅れるので onplaying を使う
+      video.onplaying = () => {
+        startBtn.style.display = "none";
+        loop();
+      };
+
+      video.play();
+    })
+    .catch(err => {
+      alert("カメラ取得エラー: " + err);
+    });
+};
+</script>
+
+</body>
+</html>
