@@ -136,8 +136,15 @@ startBtn.onclick = () => {
 
       video.play();
 
-      startBtn.style.display = "none";
-      loop();
+// ▼ Safari が内部バッファを初期化するのを待つ
+video.onloadedmetadata = () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+};
+
+startBtn.style.display = "none";
+loop();
+
     })
     .catch(err => {
       alert("カメラ取得エラー: " + err);
