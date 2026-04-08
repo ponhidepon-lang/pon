@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>疲労チェック（PWA版）</title>
 
-<!-- PWA 追加 -->
+<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,13 +37,6 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const scoreDiv = document.getElementById("score");
 const logDiv = document.getElementById("log");
-
-// ▼ iPhone Safari で安定する低解像度
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "user", width: 320, height: 240 }
-}).then(stream => {
-  video.srcObject = stream;
-});
 
 // ▼ 距離計算
 function dist(a, b) {
@@ -97,7 +90,7 @@ faceMesh.onResults(results => {
   logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
 });
 
-// ▼ iPhone Safari で安定するループ処理
+// ▼ ループ処理（video.play() 後に開始）
 async function loop() {
   canvas.width = 320;
   canvas.height = 240;
@@ -106,7 +99,18 @@ async function loop() {
   requestAnimationFrame(loop);
 }
 
-loop();
+// ▼ iPhone PWA で必須：video.play() を待つ
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "user", width: 320, height: 240 }
+}).then(async stream => {
+  video.srcObject = stream;
+
+  // ▼ これが無いと PWA で FaceMesh が動かない
+  await video.play();
+
+  // ▼ 再生可能になってから開始
+  loop();
+});
 </script>
 
 </body>
