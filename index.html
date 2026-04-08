@@ -123,8 +123,13 @@ startBtn.onclick = () => {
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
 
-    // ▼ 最重要：同期で呼ぶ（await を絶対に使わない）
-    video.play();
+    // ▼ Safari PWA では CSS が無視されるため JS で強制
+    video.width = 320;
+    video.height = 240;
+    canvas.width = 320;
+    canvas.height = 240;
+
+    video.play();  // 同期で呼ぶ
 
     startBtn.style.display = "none";
     loop();
