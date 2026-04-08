@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>疲労チェック（PWA版）</title>
+<title>疲労チェック（軽量版）</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ffffff">
@@ -31,7 +31,7 @@
 </head>
 <body>
 
-<h3>疲労チェック（iPhone PWA版）</h3>
+<h3>疲労チェック（iPhone SE3 軽量版）</h3>
 
 <button id="startBtn">カメラを開始</button>
 
@@ -56,13 +56,14 @@ function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+// ▼ FaceMesh（軽量設定）
 const faceMesh = new FaceMesh.FaceMesh({
   locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
 });
 
 faceMesh.setOptions({
   maxNumFaces: 1,
-  refineLandmarks: true,
+  refineLandmarks: false,   // ← GPU負荷を大幅削減
   minDetectionConfidence: 0.5,
   minTrackingConfidence: 0.5
 });
@@ -101,27 +102,25 @@ faceMesh.onResults(results => {
   logDiv.innerText = `EAR: ${ear.toFixed(3)}\nMOUTH: ${mouth.toFixed(3)}`;
 });
 
+// ▼ 5フレームに1回だけ FaceMesh を実行（SE3安定化の決め手）
 let frameCount = 0;
 
 async function loop() {
   frameCount++;
 
-  // ▼ 3フレームに1回だけ FaceMesh を実行
-  if (frameCount % 3 === 0) {
+  if (frameCount % 5 === 0) {
     await faceMesh.send({ image: video });
   }
 
   requestAnimationFrame(loop);
 }
 
-
-
 // ▼ Safari がユーザー操作と認識する同期イベント
 startBtn.onclick = () => {
 
   const constraints = {
     audio: false,
-    video: { facingMode: "user", width: 320, height: 240 }
+    video: { facingMode: "user", width: 160, height: 120 }  // ← 解像度を半分にして安定化
   };
 
   navigator.mediaDevices.getUserMedia(constraints)
@@ -133,7 +132,7 @@ startBtn.onclick = () => {
       video.setAttribute("playsinline", "");
       video.setAttribute("webkit-playsinline", "");
 
-      // ▼ 内部バッファ初期化（Safariで必須）
+      // ▼ 内部バッファ初期化
       video.onloadedmetadata = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
